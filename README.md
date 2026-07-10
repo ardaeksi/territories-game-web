@@ -1,32 +1,31 @@
-# React + TypeScript + Vite
+# territories-game-web
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Frontend for a Risk-style territory conquest game. React 19, TypeScript, Vite, react-globe.gl.
 
-Currently, two official plugins are available:
+Two routes:
+- `/` and `/game` - the territory conquest game (join, claim adjacent territory on a 3D globe)
+- `/sim` - the personnel readiness dashboard this project was forked out of
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Local setup
 
-## React Compiler
+Requires the backend (`territories-game-api`) running first - see that repo's README for Postgres,
+keystore, and self-signed cert setup.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```
+npm install
+npm run dev
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+Open `http://localhost:5173`.
+
+## Local network (LAN) play
+
+See `territories-game-api`'s README for the full LAN setup, including the firewall rules (added
+and removed as a toggle, not left on permanently). Once those are in place, start this project with:
+
+```
+npm run dev:lan
+```
+
+instead of `npm run dev` - this binds Vite to all network interfaces so LAN peers can reach it,
+rather than just `localhost`.
