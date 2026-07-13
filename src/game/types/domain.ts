@@ -23,3 +23,19 @@ export interface ResourceStockpile {
   playerId: number;
   amounts: Partial<Record<ResourceType, number>>;
 }
+
+export type BuildingType = "MINE" | "OIL_RIG" | "GUNPOWDER_FACTORY" | "BOAT_FACTORY" | "ARMY_CAMP" | "ARMY_FACTORY";
+
+export interface Building {
+  id: number;
+  territoryId: number;
+  territoryName: string;
+  type: BuildingType;
+  builtAt: string;
+}
+
+export interface BuildingBlueprint {
+  type: BuildingType;
+  cost: Partial<Record<ResourceType, number>>;
+  unlocksSpendingOf: ResourceType | null;
+}

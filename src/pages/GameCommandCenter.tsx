@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { AnimatePresence } from "framer-motion";
 import { TerritoryGlobe } from "../game/components/TerritoryGlobe";
 import { ResourceHud } from "../game/components/ResourceHud";
+import { BuildingShopPanel } from "../game/components/BuildingShopPanel";
 import { fetchTerritories, claimTerritory } from "../game/api/territories";
 import { fetchResources } from "../game/api/resources";
 import { getStoredPlayer } from "../game/playerSession";
@@ -15,6 +17,7 @@ export function GameCommandCenter() {
   const [territories, setTerritories] = useState<Territory[]>([]);
   const [stockpile, setStockpile] = useState<ResourceStockpile | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [selectedTerritoryId, setSelectedTerritoryId] = useState<number | null>(null);
 
   const loadTerritories = useCallback(async () => {
     try {
@@ -43,9 +46,9 @@ export function GameCommandCenter() {
     }
     loadTerritories();
     loadResources();
-    // Resources only ever change via this player's own capture actions (a one-time
-    // credit, not a passive tick), so territories are the only thing worth polling -
-    // resources just get refetched right after a successful claim, below.
+    // Resources only ever change via this player's own capture/spend actions (one-time
+    // credits/debits, not a passive tick), so territories are the only thing worth
+    // polling - resources just get refetched right after a claim or building purchase.
     const territoryInterval = window.setInterval(loadTerritories, TERRITORY_POLL_INTERVAL_MS);
     return () => window.clearInterval(territoryInterval);
   }, [player, navigate, loadTerritories, loadResources]);
@@ -66,6 +69,7 @@ export function GameCommandCenter() {
 
   const ownedCount = territories.filter((t) => t.ownerId === player.id).length;
   const unclaimedCount = territories.filter((t) => t.ownerId === null).length;
+  const selectedTerritory = territories.find((t) => t.id === selectedTerritoryId) ?? null;
 
   return (
     <div className="game-center">
@@ -80,8 +84,24 @@ export function GameCommandCenter() {
       {statusMessage && <div className="status-banner">{statusMessage}</div>}
 
       <div className="game-body">
-        <TerritoryGlobe territories={territories} onClaimTerritory={handleClaimTerritory} />
+        <TerritoryGlobe
+          territories={territories}
+          playerId={player.id}
+          onClaimTerritory={handleClaimTerritory}
+          onSelectOwnTerritory={setSelectedTerritoryId}
+        />
         <ResourceHud stockpile={stockpile} />
+
+        <AnimatePresence>
+          {selectedTerritory && (
+            <BuildingShopPanel
+              territory={selectedTerritory}
+              playerId={player.id}
+              onClose={() => setSelectedTerritoryId(null)}
+              onBuildingConstructed={loadResources}
+            />
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );

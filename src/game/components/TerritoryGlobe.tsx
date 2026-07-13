@@ -9,7 +9,9 @@ import { RESOURCE_LABELS, RESOURCE_ORDER } from "../constants/resources";
 
 interface TerritoryGlobeProps {
   territories: Territory[];
+  playerId: number;
   onClaimTerritory: (territoryId: number) => void;
+  onSelectOwnTerritory: (territoryId: number) => void;
 }
 
 const OCEAN_COLOR = 0x0c2f4f;
@@ -32,7 +34,7 @@ function countryIdFor(id: string | number | undefined, name: string | undefined)
   return "name-" + (name ?? "unknown").toLowerCase().replace(/[^a-z0-9]+/g, "-");
 }
 
-export function TerritoryGlobe({ territories, onClaimTerritory }: TerritoryGlobeProps) {
+export function TerritoryGlobe({ territories, playerId, onClaimTerritory, onSelectOwnTerritory }: TerritoryGlobeProps) {
   const globeRef = useRef<GlobeMethods | undefined>(undefined);
   const [countryFeatures, setCountryFeatures] = useState<Feature<Geometry>[]>([]);
 
@@ -90,9 +92,13 @@ export function TerritoryGlobe({ territories, onClaimTerritory }: TerritoryGlobe
       }}
       onPolygonClick={(polygon) => {
         const territory = territoryFor(polygon);
-        if (territory) {
+        if (!territory) return;
+        if (territory.ownerId === playerId) {
+          onSelectOwnTerritory(territory.id);
+        } else if (territory.ownerId === null) {
           onClaimTerritory(territory.id);
         }
+        // Owned by another player: no action - their info is already visible on hover.
       }}
     />
   );
