@@ -1,16 +1,20 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { TerritoryGlobe } from "../game/components/TerritoryGlobe";
+import { ResourceHud } from "../game/components/ResourceHud";
 import { fetchTerritories, claimTerritory } from "../game/api/territories";
+import { fetchResources } from "../game/api/resources";
 import { getStoredPlayer } from "../game/playerSession";
-import type { Territory } from "../game/types/domain";
+import type { ResourceStockpile, Territory } from "../game/types/domain";
 
-const POLL_INTERVAL_MS = 4000;
+const TERRITORY_POLL_INTERVAL_MS = 4000;
+const RESOURCE_POLL_INTERVAL_MS = 2000;
 
 export function GameCommandCenter() {
   const navigate = useNavigate();
   const player = getStoredPlayer();
   const [territories, setTerritories] = useState<Territory[]>([]);
+  const [stockpile, setStockpile] = useState<ResourceStockpile | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   const loadTerritories = useCallback(async () => {
@@ -22,15 +26,32 @@ export function GameCommandCenter() {
     }
   }, []);
 
+  const loadResources = useCallback(async () => {
+    if (!player) return;
+    try {
+      const data = await fetchResources(player.id);
+      setStockpile(data);
+    } catch {
+      // Resource polling failures aren't worth interrupting the player with a banner -
+      // the next tick will retry, and the territory poll's error banner already covers
+      // "server unreachable" for this same root cause.
+    }
+  }, [player]);
+
   useEffect(() => {
     if (!player) {
       navigate("/");
       return;
     }
     loadTerritories();
-    const interval = window.setInterval(loadTerritories, POLL_INTERVAL_MS);
-    return () => window.clearInterval(interval);
-  }, [player, navigate, loadTerritories]);
+    loadResources();
+    const territoryInterval = window.setInterval(loadTerritories, TERRITORY_POLL_INTERVAL_MS);
+    const resourceInterval = window.setInterval(loadResources, RESOURCE_POLL_INTERVAL_MS);
+    return () => {
+      window.clearInterval(territoryInterval);
+      window.clearInterval(resourceInterval);
+    };
+  }, [player, navigate, loadTerritories, loadResources]);
 
   if (!player) {
     return null;
@@ -63,6 +84,7 @@ export function GameCommandCenter() {
 
       <div className="game-body">
         <TerritoryGlobe territories={territories} onClaimTerritory={handleClaimTerritory} />
+        <ResourceHud stockpile={stockpile} />
       </div>
     </div>
   );

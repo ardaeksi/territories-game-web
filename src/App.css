@@ -458,7 +458,48 @@
 .game-body {
   flex: 1;
   min-height: 0;
+  position: relative;
   background: #05070a;
+}
+
+.resource-hud {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 10;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  padding: 10px;
+  background: rgba(10, 14, 20, 0.85);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  backdrop-filter: blur(2px);
+}
+
+.resource-hud-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 10px;
+  border: 1px solid var(--panel-border);
+  border-left-width: 3px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.resource-hud-count {
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.resource-hud-label {
+  font-size: 9px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .territory-tooltip {

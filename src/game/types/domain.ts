@@ -18,3 +18,8 @@ export interface Territory {
   population: number;
   resources: Partial<Record<ResourceType, number>>;
 }
+
+export interface ResourceStockpile {
+  playerId: number;
+  amounts: Partial<Record<ResourceType, number>>;
+}
