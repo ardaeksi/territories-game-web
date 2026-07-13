@@ -8,7 +8,6 @@ import { getStoredPlayer } from "../game/playerSession";
 import type { ResourceStockpile, Territory } from "../game/types/domain";
 
 const TERRITORY_POLL_INTERVAL_MS = 4000;
-const RESOURCE_POLL_INTERVAL_MS = 2000;
 
 export function GameCommandCenter() {
   const navigate = useNavigate();
@@ -32,8 +31,7 @@ export function GameCommandCenter() {
       const data = await fetchResources(player.id);
       setStockpile(data);
     } catch {
-      // Resource polling failures aren't worth interrupting the player with a banner -
-      // the next tick will retry, and the territory poll's error banner already covers
+      // Not worth its own banner - the territory poll's error banner already covers
       // "server unreachable" for this same root cause.
     }
   }, [player]);
@@ -45,12 +43,11 @@ export function GameCommandCenter() {
     }
     loadTerritories();
     loadResources();
+    // Resources only ever change via this player's own capture actions (a one-time
+    // credit, not a passive tick), so territories are the only thing worth polling -
+    // resources just get refetched right after a successful claim, below.
     const territoryInterval = window.setInterval(loadTerritories, TERRITORY_POLL_INTERVAL_MS);
-    const resourceInterval = window.setInterval(loadResources, RESOURCE_POLL_INTERVAL_MS);
-    return () => {
-      window.clearInterval(territoryInterval);
-      window.clearInterval(resourceInterval);
-    };
+    return () => window.clearInterval(territoryInterval);
   }, [player, navigate, loadTerritories, loadResources]);
 
   if (!player) {
@@ -61,7 +58,7 @@ export function GameCommandCenter() {
     try {
       await claimTerritory(territoryId, player.id);
       setStatusMessage(null);
-      await loadTerritories();
+      await Promise.all([loadTerritories(), loadResources()]);
     } catch {
       setStatusMessage("Can't claim that territory - it may already be owned, or isn't adjacent to land you control.");
     }
