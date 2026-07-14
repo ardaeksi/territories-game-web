@@ -11,6 +11,11 @@ export async function fetchBuildingsForTerritory(territoryId: number): Promise<B
   return response.data;
 }
 
+export async function fetchAllBuildings(): Promise<Building[]> {
+  const response = await apiClient.get<Building[]>("/api/game/buildings");
+  return response.data;
+}
+
 export async function constructBuilding(territoryId: number, playerId: number, type: BuildingType): Promise<Building> {
   const response = await apiClient.post<Building>(`/api/game/territories/${territoryId}/buildings`, {
     playerId,

@@ -37,9 +37,7 @@ const globeMaterial = new THREE.MeshPhongMaterial({
 });
 
 function createCampMarker(point: CampPoint, onSelectUnit: (unitId: number) => void): HTMLElement {
-  // react-globe.gl positions this root element itself via an inline 3D transform (CSS3DObject),
-  // so our own centering/hover transform has to live on an inner wrapper instead - applying it
-  // to the root would fight the library's own transform on every render.
+  // react-globe.gl owns this root element's transform (CSS3DObject) - ours has to live on an inner wrapper.
   const anchor = document.createElement("div");
   anchor.className = "camp-marker-anchor";
 

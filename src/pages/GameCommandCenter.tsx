@@ -4,10 +4,12 @@ import { AnimatePresence } from "framer-motion";
 import { TerritoryGlobe } from "../game/components/TerritoryGlobe";
 import { ResourceHud } from "../game/components/ResourceHud";
 import { BuildingShopPanel } from "../game/components/BuildingShopPanel";
+import { MiningPanel } from "../game/components/MiningPanel";
 import { fetchTerritories, claimTerritory } from "../game/api/territories";
 import { fetchResources } from "../game/api/resources";
+import { fetchAllBuildings } from "../game/api/buildings";
 import { getStoredPlayer } from "../game/playerSession";
-import type { ResourceStockpile, Territory } from "../game/types/domain";
+import type { Building, ResourceStockpile, Territory } from "../game/types/domain";
 
 const TERRITORY_POLL_INTERVAL_MS = 4000;
 
@@ -15,9 +17,11 @@ export function GameCommandCenter() {
   const navigate = useNavigate();
   const player = getStoredPlayer();
   const [territories, setTerritories] = useState<Territory[]>([]);
+  const [buildings, setBuildings] = useState<Building[]>([]);
   const [stockpile, setStockpile] = useState<ResourceStockpile | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [selectedTerritoryId, setSelectedTerritoryId] = useState<number | null>(null);
+  const [activeMiningBuildingId, setActiveMiningBuildingId] = useState<number | null>(null);
 
   const loadTerritories = useCallback(async () => {
     try {
@@ -34,10 +38,18 @@ export function GameCommandCenter() {
       const data = await fetchResources(player.id);
       setStockpile(data);
     } catch {
-      // Not worth its own banner - the territory poll's error banner already covers
-      // "server unreachable" for this same root cause.
+      // Territory poll's error banner already covers "server unreachable".
     }
   }, [player]);
+
+  const loadBuildings = useCallback(async () => {
+    try {
+      const data = await fetchAllBuildings();
+      setBuildings(data);
+    } catch {
+      // Territory poll's error banner already covers "server unreachable".
+    }
+  }, []);
 
   useEffect(() => {
     if (!player) {
@@ -46,12 +58,11 @@ export function GameCommandCenter() {
     }
     loadTerritories();
     loadResources();
-    // Resources only ever change via this player's own capture/spend actions (one-time
-    // credits/debits, not a passive tick), so territories are the only thing worth
-    // polling - resources just get refetched right after a claim or building purchase.
+    loadBuildings();
+    // Resources/buildings only change via this player's own actions, so only territories poll.
     const territoryInterval = window.setInterval(loadTerritories, TERRITORY_POLL_INTERVAL_MS);
     return () => window.clearInterval(territoryInterval);
-  }, [player, navigate, loadTerritories, loadResources]);
+  }, [player, navigate, loadTerritories, loadResources, loadBuildings]);
 
   if (!player) {
     return null;
@@ -70,6 +81,7 @@ export function GameCommandCenter() {
   const ownedCount = territories.filter((t) => t.ownerId === player.id).length;
   const unclaimedCount = territories.filter((t) => t.ownerId === null).length;
   const selectedTerritory = territories.find((t) => t.id === selectedTerritoryId) ?? null;
+  const activeMiningBuilding = buildings.find((b) => b.id === activeMiningBuildingId) ?? null;
 
   return (
     <div className="game-center">
@@ -86,20 +98,41 @@ export function GameCommandCenter() {
       <div className="game-body">
         <TerritoryGlobe
           territories={territories}
+          buildings={buildings}
           playerId={player.id}
           onClaimTerritory={handleClaimTerritory}
           onSelectOwnTerritory={setSelectedTerritoryId}
+          onSelectMineBuilding={setActiveMiningBuildingId}
         />
         <ResourceHud stockpile={stockpile} />
 
-        <AnimatePresence>
-          {selectedTerritory && (
-            <BuildingShopPanel
-              territory={selectedTerritory}
+        <AnimatePresence mode="wait">
+          {activeMiningBuilding ? (
+            <MiningPanel
+              key="mining"
+              buildingId={activeMiningBuilding.id}
+              territoryName={activeMiningBuilding.territoryName}
               playerId={player.id}
-              onClose={() => setSelectedTerritoryId(null)}
-              onBuildingConstructed={loadResources}
+              onClose={() => setActiveMiningBuildingId(null)}
+              onCollected={loadResources}
             />
+          ) : (
+            selectedTerritory && (
+              <BuildingShopPanel
+                key="shop"
+                territory={selectedTerritory}
+                playerId={player.id}
+                onClose={() => setSelectedTerritoryId(null)}
+                onBuildingConstructed={() => {
+                  loadResources();
+                  loadBuildings();
+                }}
+                onOperateBuilding={(building) => {
+                  setActiveMiningBuildingId(building.id);
+                  setSelectedTerritoryId(null);
+                }}
+              />
+            )
           )}
         </AnimatePresence>
       </div>

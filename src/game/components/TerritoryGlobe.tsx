@@ -4,14 +4,35 @@ import * as THREE from "three";
 import { feature } from "topojson-client";
 import type { GeometryCollection, Topology } from "topojson-specification";
 import type { Feature, Geometry } from "geojson";
-import type { Territory } from "../types/domain";
+import type { Building, Territory } from "../types/domain";
 import { RESOURCE_LABELS, RESOURCE_ORDER } from "../constants/resources";
+import { animateBuildingObject, createBuildingObject } from "../three/buildingModels";
 
 interface TerritoryGlobeProps {
   territories: Territory[];
+  buildings: Building[];
   playerId: number;
   onClaimTerritory: (territoryId: number) => void;
   onSelectOwnTerritory: (territoryId: number) => void;
+  onSelectMineBuilding: (buildingId: number) => void;
+}
+
+interface BuildingMarker {
+  building: Building;
+  lat: number;
+  lng: number;
+}
+
+/** Small fixed-radius ring offset so co-located buildings on one territory don't overlap. */
+const MARKER_JITTER_DEGREES = 0.55;
+
+function jitteredPosition(centroidLat: number, centroidLng: number, index: number, total: number) {
+  if (total <= 1) return { lat: centroidLat, lng: centroidLng };
+  const angle = (index / total) * Math.PI * 2;
+  return {
+    lat: centroidLat + Math.sin(angle) * MARKER_JITTER_DEGREES,
+    lng: centroidLng + Math.cos(angle) * MARKER_JITTER_DEGREES,
+  };
 }
 
 const OCEAN_COLOR = 0x0c2f4f;
@@ -23,10 +44,7 @@ const globeMaterial = new THREE.MeshPhongMaterial({
   shininess: 18,
 });
 
-// Mirrors the fallback id logic in scripts/generate-territories.mjs: a handful of
-// disputed/unrecognized territories (Kosovo, Somaliland, N. Cyprus) have no ISO
-// numeric id in this topology, so both sides derive the same slug fallback to stay
-// in sync on what "countryId" means for those entries.
+// Mirrors the fallback id logic in scripts/generate-territories.mjs for territories with no ISO id.
 function countryIdFor(id: string | number | undefined, name: string | undefined): string {
   if (id !== undefined && id !== null) {
     return String(id);
@@ -34,9 +52,17 @@ function countryIdFor(id: string | number | undefined, name: string | undefined)
   return "name-" + (name ?? "unknown").toLowerCase().replace(/[^a-z0-9]+/g, "-");
 }
 
-export function TerritoryGlobe({ territories, playerId, onClaimTerritory, onSelectOwnTerritory }: TerritoryGlobeProps) {
+export function TerritoryGlobe({
+  territories,
+  buildings,
+  playerId,
+  onClaimTerritory,
+  onSelectOwnTerritory,
+  onSelectMineBuilding,
+}: TerritoryGlobeProps) {
   const globeRef = useRef<GlobeMethods | undefined>(undefined);
   const [countryFeatures, setCountryFeatures] = useState<Feature<Geometry>[]>([]);
+  const animatedObjects = useRef(new Map<number, { object: THREE.Object3D; type: Building["type"] }>());
 
   useEffect(() => {
     fetch("/countries-110m.json")
@@ -62,6 +88,49 @@ export function TerritoryGlobe({ territories, playerId, onClaimTerritory, onSele
     const f = polygon as Feature<Geometry>;
     return territoryByCountryId.get(countryIdFor(f.id, (f.properties as { name?: string } | null)?.name));
   };
+
+  const buildingMarkers = useMemo<BuildingMarker[]>(() => {
+    const territoryById = new Map<number, Territory>();
+    territories.forEach((territory) => territoryById.set(territory.id, territory));
+
+    const byTerritory = new Map<number, Building[]>();
+    buildings.forEach((building) => {
+      const list = byTerritory.get(building.territoryId) ?? [];
+      list.push(building);
+      byTerritory.set(building.territoryId, list);
+    });
+
+    const markers: BuildingMarker[] = [];
+    byTerritory.forEach((buildingsOnTerritory, territoryId) => {
+      const territory = territoryById.get(territoryId);
+      if (!territory) return;
+      buildingsOnTerritory.forEach((building, index) => {
+        const { lat, lng } = jitteredPosition(
+          territory.centroidLat,
+          territory.centroidLng,
+          index,
+          buildingsOnTerritory.length
+        );
+        markers.push({ building, lat, lng });
+      });
+    });
+    return markers;
+  }, [territories, buildings]);
+
+  // react-globe.gl keeps re-rendering the shared scene anyway, so mutating meshes here is enough.
+  useEffect(() => {
+    let frameId: number;
+    const start = performance.now();
+    const tick = () => {
+      const elapsedSeconds = (performance.now() - start) / 1000;
+      animatedObjects.current.forEach(({ object, type }) => {
+        animateBuildingObject(type, object, elapsedSeconds);
+      });
+      frameId = requestAnimationFrame(tick);
+    };
+    frameId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frameId);
+  }, []);
 
   return (
     <Globe
@@ -99,6 +168,23 @@ export function TerritoryGlobe({ territories, playerId, onClaimTerritory, onSele
           onClaimTerritory(territory.id);
         }
         // Owned by another player: no action - their info is already visible on hover.
+      }}
+      objectsData={buildingMarkers}
+      objectLat={(d) => (d as BuildingMarker).lat}
+      objectLng={(d) => (d as BuildingMarker).lng}
+      objectAltitude={0.015}
+      objectLabel={(d) => (d as BuildingMarker).building.type.replace(/_/g, " ")}
+      objectThreeObject={(d) => {
+        const marker = d as BuildingMarker;
+        const object = createBuildingObject(marker.building.type);
+        animatedObjects.current.set(marker.building.id, { object, type: marker.building.type });
+        return object;
+      }}
+      onObjectClick={(d) => {
+        const marker = d as BuildingMarker;
+        if (marker.building.type === "MINE") {
+          onSelectMineBuilding(marker.building.id);
+        }
       }}
     />
   );

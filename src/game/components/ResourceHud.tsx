@@ -1,5 +1,6 @@
 import { RESOURCE_COLORS, RESOURCE_LABELS, RESOURCE_ORDER } from "../constants/resources";
 import type { ResourceStockpile } from "../types/domain";
+import { ResourceIcon } from "./icons/ResourceIcon";
 
 interface ResourceHudProps {
   stockpile: ResourceStockpile | null;
@@ -10,10 +11,13 @@ export function ResourceHud({ stockpile }: ResourceHudProps) {
     <div className="resource-hud">
       {RESOURCE_ORDER.map((type) => (
         <div key={type} className="resource-hud-tile" style={{ borderColor: RESOURCE_COLORS[type] }}>
-          <span className="resource-hud-count" style={{ color: RESOURCE_COLORS[type] }}>
-            {Math.floor(stockpile?.amounts[type] ?? 0).toLocaleString()}
-          </span>
-          <span className="resource-hud-label">{RESOURCE_LABELS[type]}</span>
+          <ResourceIcon type={type} size={18} color={RESOURCE_COLORS[type]} className="resource-hud-icon" />
+          <div className="resource-hud-text">
+            <span className="resource-hud-count" style={{ color: RESOURCE_COLORS[type] }}>
+              {Math.floor(stockpile?.amounts[type] ?? 0).toLocaleString()}
+            </span>
+            <span className="resource-hud-label">{RESOURCE_LABELS[type]}</span>
+          </div>
         </div>
       ))}
     </div>

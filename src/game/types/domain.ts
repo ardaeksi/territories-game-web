@@ -39,3 +39,20 @@ export interface BuildingBlueprint {
   cost: Partial<Record<ResourceType, number>>;
   unlocksSpendingOf: ResourceType | null;
 }
+
+export interface MiningPreset {
+  key: string;
+  label: string;
+  durationSeconds: number;
+  yieldByResource: Partial<Record<ResourceType, number>>;
+}
+
+export interface MiningJob {
+  id: number;
+  buildingId: number;
+  resourceType: ResourceType;
+  startedAt: string;
+  durationSeconds: number;
+  yieldAmount: number;
+  collectedAt: string | null;
+}
